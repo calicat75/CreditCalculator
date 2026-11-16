@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+pydantic[email]
+pydantic-settings
+python-dotenv
+
+pytest
+pytest-cov
+httpxpython -m venv venv
