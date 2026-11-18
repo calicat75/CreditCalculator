@@ -5,18 +5,18 @@ from app.models.responses import PaymentScheduleElementDto
 
 CENT = Decimal("0.01")
 ONE = Decimal("1")
-TWELVE = Decimal("12")
+
 
 def round_money(value: Decimal) -> Decimal:
     return value.quantize(CENT, rounding=ROUND_HALF_UP)
 
 
 def calculate_annuity_payment(
-    amount: Decimal,            #сумма кредита
-    annual_rate: Decimal,       #годовая процентная ставка в процентах
-    term: int,                  #срок кредита в месяцах
+    amount: Decimal,
+    annual_rate: Decimal,
+    term: int,
 ) -> Decimal:
-
+    """Рассчитывает ежемесячный аннуитетный платеж."""
     if amount <= 0:
         raise ValueError("Сумма кредита должна быть положительной")
 
@@ -31,13 +31,11 @@ def calculate_annuity_payment(
     if monthly_rate == 0:
         return round_money(amount / Decimal(term))
 
-    coefficient = (
-        monthly_rate
-        * (ONE + monthly_rate) ** term
-        / ((ONE + monthly_rate) ** term - ONE)
-    )
+    factor = (ONE + monthly_rate) ** term
 
-    return round_money(amount * coefficient)
+    return round_money(
+        amount * monthly_rate * factor / (factor - ONE)
+    )
 
 
 def add_months(source_date: date, months: int) -> date:
@@ -47,11 +45,9 @@ def add_months(source_date: date, months: int) -> date:
     month = month_index % 12 + 1
 
     last_day = monthrange(year, month)[1]
-    day = min(source_date.day, last_day)
 
-    return date(year, month, day)
+    return date(year, month, min(source_date.day, last_day))
 
-#помесячный график погашения кредита
 def generate_payment_schedule(
     amount: Decimal,
     annual_rate: Decimal,
@@ -59,7 +55,7 @@ def generate_payment_schedule(
     monthly_payment: Decimal,
     start_date: date | None = None,
 ) -> list[PaymentScheduleElementDto]:
-
+    """Генерирует график ежемесячных платежей."""
     if amount <= 0:
         raise ValueError("Сумма кредита должна быть положительной")
 
@@ -78,7 +74,7 @@ def generate_payment_schedule(
     monthly_rate = annual_rate / Decimal("1200")
     remaining_debt = round_money(amount)
 
-    schedule: list[PaymentScheduleElementDto] = []
+    schedule = []
 
     for number in range(1, term + 1):
         interest_payment = round_money(
@@ -126,3 +122,51 @@ def generate_payment_schedule(
         )
 
     return schedule
+
+def calculate_psk(
+    amount: Decimal,
+    monthly_payment: Decimal,
+    term: int,
+) -> Decimal:
+
+    if amount <= 0:
+        raise ValueError("Сумма кредита должна быть положительной")
+
+    if monthly_payment <= 0:
+        raise ValueError("Ежемесячный платеж должен быть положительным")
+
+    if term <= 0:
+        raise ValueError("Срок кредита должен быть положительным")
+
+    if monthly_payment * term == amount:
+        return Decimal("0.00")
+
+    low = Decimal("0")
+    high = Decimal("1")
+
+    for _ in range(200):
+        monthly_rate = (low + high) / Decimal("2")
+
+        if monthly_rate == 0:
+            calculated_amount = monthly_payment * term
+        else:
+            factor = (ONE + monthly_rate) ** term
+
+            calculated_amount = (
+                monthly_payment
+                * (factor - ONE)
+                / (monthly_rate * factor)
+            )
+
+        if calculated_amount > amount:
+            low = monthly_rate
+        else:
+            high = monthly_rate
+
+    monthly_rate = (low + high) / Decimal("2")
+
+    annual_rate = (
+        (ONE + monthly_rate) ** 12 - ONE
+    ) * Decimal("100")
+
+    return round_money(annual_rate)
