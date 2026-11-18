@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.utils.calculations import (
+from calculator.app.utils.calculations import (
     add_months,
     calculate_annuity_payment,
     calculate_psk,
@@ -52,7 +52,11 @@ def test_calculate_annuity_payment_invalid_data(
     term,
 ):
     with pytest.raises(ValueError):
-        calculate_annuity_payment(amount, annual_rate, term)
+        calculate_annuity_payment(
+            amount,
+            annual_rate,
+            term,
+        )
 
 
 def test_add_months():
@@ -87,10 +91,8 @@ def test_generate_payment_schedule():
     )
 
     assert len(schedule) == term
-
     assert schedule[0].number == 1
     assert schedule[0].date == date(2026, 2, 15)
-
     assert schedule[-1].number == 12
     assert schedule[-1].remaining_debt == Decimal("0.00")
 
@@ -106,9 +108,8 @@ def test_schedule_has_correct_payment_parts():
 
     first_payment = schedule[0]
 
-    assert (
-        first_payment.total_payment
-        == first_payment.interest_payment
+    assert first_payment.total_payment == (
+        first_payment.interest_payment
         + first_payment.debt_payment
     )
 
@@ -147,4 +148,8 @@ def test_calculate_psk_invalid_data(
     term,
 ):
     with pytest.raises(ValueError):
-        calculate_psk(amount, monthly_payment, term)
+        calculate_psk(
+            amount,
+            monthly_payment,
+            term,
+        )
