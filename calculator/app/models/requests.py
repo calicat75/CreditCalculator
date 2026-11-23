@@ -9,62 +9,88 @@ from pydantic import (
     field_validator,
 )
 
-class LoanStatementRequestDto(BaseModel):
+MIN_AMOUNT = Decimal("10000")
+MAX_AMOUNT = Decimal("5000000")
+
+MIN_TERM = 6
+MAX_TERM = 60
+
+MIN_AGE = 18
+MAX_AGE = 65
+
+NAME_PATTERN = r"^[A-Za-z]{2,30}$"
+PASSPORT_SERIES_PATTERN = r"^\d{4}$"
+PASSPORT_NUMBER_PATTERN = r"^\d{6}$"
+
+
+class PersonalDataDto(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    amount: Decimal = Field(gt=0)
-    term: int = Field(gt=0)
+    first_name: str = Field(
+        alias="firstName",
+        pattern=NAME_PATTERN,
+    )
+    last_name: str = Field(
+        alias="lastName",
+        pattern=NAME_PATTERN,
+    )
+    middle_name: str = Field(
+        alias="middleName",
+        pattern=NAME_PATTERN,
+    )
 
-    first_name: str = Field(alias="firstName", min_length=1)
-    last_name: str = Field(alias="lastName", min_length=1)
-    middle_name: str = Field(alias="middleName", min_length=1)
-
-    email: EmailStr
     birthdate: date
 
     passport_series: str = Field(
         alias="passportSeries",
-        pattern=r"^\d{4}$",
+        pattern=PASSPORT_SERIES_PATTERN,
     )
     passport_number: str = Field(
         alias="passportNumber",
-        pattern=r"^\d{6}$",
+        pattern=PASSPORT_NUMBER_PATTERN,
     )
 
     @field_validator("birthdate")
     @classmethod
     def validate_birthdate(cls, value: date) -> date:
-        if value >= date.today():
-            raise ValueError("Birthdate must be in the past")
+        today = date.today()
+
+        age = (
+            today.year
+            - value.year
+            - ((today.month, today.day) < (value.month, value.day))
+        )
+
+        if not MIN_AGE <= age <= MAX_AGE:
+            raise ValueError(
+                f"Возраст заёмщика должен быть от {MIN_AGE} до {MAX_AGE} лет"
+            )
+
         return value
 
-class ScoringDataDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
 
-    amount: Decimal = Field(gt=0)
-    term: int = Field(gt=0)
-
-    first_name: str = Field(alias="firstName", min_length=1)
-    last_name: str = Field(alias="lastName", min_length=1)
-    middle_name: str = Field(alias="middleName", min_length=1)
-
-    birthdate: date
-
-    passport_series: str = Field(
-        alias="passportSeries",
-        pattern=r"^\d{4}$",
+class LoanStatementRequestDto(PersonalDataDto):
+    amount: Decimal = Field(
+        ge=MIN_AMOUNT,
+        le=MAX_AMOUNT,
     )
-    passport_number: str = Field(
-        alias="passportNumber",
-        pattern=r"^\d{6}$",
+    term: int = Field(
+        ge=MIN_TERM,
+        le=MAX_TERM,
+    )
+
+    email: EmailStr
+
+
+class ScoringDataDto(PersonalDataDto):
+    amount: Decimal = Field(
+        ge=MIN_AMOUNT,
+        le=MAX_AMOUNT,
+    )
+    term: int = Field(
+        ge=MIN_TERM,
+        le=MAX_TERM,
     )
 
     is_insurance_enabled: bool = Field(alias="isInsuranceEnabled")
     is_salary_client: bool = Field(alias="isSalaryClient")
-
-    @field_validator("birthdate")
-    @classmethod
-    def validate_birthdate(cls, value: date) -> date:
-        if value >= date.today():
-            raise ValueError("Birthdate must be in the past")
-        return value

@@ -4,7 +4,7 @@ from uuid import UUID
 import pytest
 from fastapi.testclient import TestClient
 
-from calculator.app.main import app
+from app.main import app
 
 
 client = TestClient(app)
@@ -160,7 +160,7 @@ def test_offers_reject_invalid_amount(loan_request):
         json=loan_request,
     )
 
-    assert response.status_code in (400, 422)
+    assert response.status_code == 422
 
 
 def test_offers_reject_invalid_term(loan_request):
@@ -171,4 +171,19 @@ def test_offers_reject_invalid_term(loan_request):
         json=loan_request,
     )
 
-    assert response.status_code in (400, 422)
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["Ivan1", "I", "Ivan!", "12345"],
+)
+def test_offers_reject_invalid_name(loan_request, name):
+    loan_request["firstName"] = name
+
+    response = client.post(
+        "/calculator/offers",
+        json=loan_request,
+    )
+
+    assert response.status_code == 422

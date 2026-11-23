@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import pytest
 
-from calculator.app.utils.calculations import (
+from app.utils.calculations import (
     add_months,
     calculate_annuity_payment,
     calculate_psk,

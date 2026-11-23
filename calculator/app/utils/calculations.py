@@ -1,7 +1,9 @@
 from calendar import monthrange
 from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
+
 from app.models.responses import PaymentScheduleElementDto
+
 
 CENT = Decimal("0.01")
 ONE = Decimal("1")
@@ -17,6 +19,7 @@ def calculate_annuity_payment(
     term: int,
 ) -> Decimal:
     """Рассчитывает ежемесячный аннуитетный платеж."""
+
     if amount <= 0:
         raise ValueError("Сумма кредита должна быть положительной")
 
@@ -48,6 +51,7 @@ def add_months(source_date: date, months: int) -> date:
 
     return date(year, month, min(source_date.day, last_day))
 
+
 def generate_payment_schedule(
     amount: Decimal,
     annual_rate: Decimal,
@@ -56,6 +60,7 @@ def generate_payment_schedule(
     start_date: date | None = None,
 ) -> list[PaymentScheduleElementDto]:
     """Генерирует график ежемесячных платежей."""
+
     if amount <= 0:
         raise ValueError("Сумма кредита должна быть положительной")
 
@@ -64,9 +69,6 @@ def generate_payment_schedule(
 
     if annual_rate < 0:
         raise ValueError("Процентная ставка не может быть отрицательной")
-
-    if monthly_payment <= 0:
-        raise ValueError("Ежемесячный платеж должен быть положительным")
 
     if start_date is None:
         start_date = date.today()
@@ -88,6 +90,7 @@ def generate_payment_schedule(
             )
         else:
             total_payment = monthly_payment
+
             debt_payment = round_money(
                 total_payment - interest_payment
             )
@@ -123,11 +126,13 @@ def generate_payment_schedule(
 
     return schedule
 
+
 def calculate_psk(
     amount: Decimal,
     monthly_payment: Decimal,
     term: int,
 ) -> Decimal:
+    """Рассчитывает эффективную годовую ставку по ежемесячным платежам."""
 
     if amount <= 0:
         raise ValueError("Сумма кредита должна быть положительной")
@@ -137,9 +142,6 @@ def calculate_psk(
 
     if term <= 0:
         raise ValueError("Срок кредита должен быть положительным")
-
-    if monthly_payment * term == amount:
-        return Decimal("0.00")
 
     low = Decimal("0")
     high = Decimal("1")
