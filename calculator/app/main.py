@@ -11,7 +11,3 @@ app = FastAPI(
     version="1.0.0",
 )
 app.include_router(calculator_router)
-
-@app.get("/health", tags=["Health"])
-def health_check() -> dict[str, str]:
-    return {"status": "ok"}

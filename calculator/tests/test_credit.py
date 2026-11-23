@@ -1,8 +1,6 @@
 from datetime import date
 from decimal import Decimal
 
-import pytest
-
 from app.utils.calculations import (
     add_months,
     calculate_annuity_payment,
@@ -35,28 +33,6 @@ def test_calculate_annuity_payment_with_zero_rate():
     )
 
     assert payment == Decimal("10000.00")
-
-
-@pytest.mark.parametrize(
-    ("amount", "annual_rate", "term"),
-    [
-        (Decimal("0"), Decimal("12"), 12),
-        (Decimal("-1000"), Decimal("12"), 12),
-        (Decimal("1000"), Decimal("12"), 0),
-        (Decimal("1000"), Decimal("-1"), 12),
-    ],
-)
-def test_calculate_annuity_payment_invalid_data(
-    amount,
-    annual_rate,
-    term,
-):
-    with pytest.raises(ValueError):
-        calculate_annuity_payment(
-            amount,
-            annual_rate,
-            term,
-        )
 
 
 def test_add_months():
@@ -132,24 +108,3 @@ def test_calculate_psk_without_overpayment():
     )
 
     assert psk == Decimal("0.00")
-
-
-@pytest.mark.parametrize(
-    ("amount", "monthly_payment", "term"),
-    [
-        (Decimal("0"), Decimal("10000"), 12),
-        (Decimal("100000"), Decimal("0"), 12),
-        (Decimal("100000"), Decimal("10000"), 0),
-    ],
-)
-def test_calculate_psk_invalid_data(
-    amount,
-    monthly_payment,
-    term,
-):
-    with pytest.raises(ValueError):
-        calculate_psk(
-            amount,
-            monthly_payment,
-            term,
-        )

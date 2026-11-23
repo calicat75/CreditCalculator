@@ -1,11 +1,17 @@
 from decimal import Decimal
 from itertools import product
 from uuid import uuid4
-from calculator.app.core.config import settings
-from calculator.app.core.logging import get_logger
-from calculator.app.models.requests import LoanStatementRequestDto
-from calculator.app.models.responses import LoanOfferDto
-from calculator.app.utils.calculations import calculate_annuity_payment
+
+from app.core.config import settings
+from app.core.exceptions import CalculationError
+from app.core.logging import get_logger
+from app.models.requests import LoanStatementRequestDto
+from app.models.responses import LoanOfferDto
+from app.utils.calculations import (
+    calculate_annuity_payment,
+    calculate_rate,
+    calculate_total_amount,
+)
 
 logger = get_logger(__name__)
 
@@ -23,8 +29,6 @@ class OfferService:
         )
 
         try:
-            self._prescore(request)
-
             statement_id = uuid4()
             offers = []
 
@@ -32,20 +36,24 @@ class OfferService:
                 [False, True],
                 repeat=2,
             ):
-                rate = self._calculate_rate(
-                    insurance,
-                    salary,
+                rate = calculate_rate(
+                    base_rate=Decimal(str(settings.base_rate)),
+                    insurance=insurance,
+                    salary=salary,
+                    insurance_discount=Decimal(str(settings.insurance_discount)),
+                    salary_discount=Decimal(str(settings.salary_discount)),
                 )
 
-                total_amount = self._calculate_total_amount(
-                    request.amount,
-                    insurance,
+                total_amount = calculate_total_amount(
+                    amount=request.amount,
+                    insurance=insurance,
+                    insurance_cost=Decimal(str(settings.insurance_cost)),
                 )
 
-                monthly_payment = self._calculate_monthly_payment(
-                    total_amount,
-                    rate,
-                    request.term,
+                monthly_payment = calculate_annuity_payment(
+                    amount=total_amount,
+                    annual_rate=rate,
+                    term=request.term,
                 )
 
                 offers.append(
@@ -74,9 +82,9 @@ class OfferService:
 
             return offers
 
-        except ValueError:
+        except CalculationError:
             logger.warning(
-                "Ошибка проверки кредитной заявки"
+                "Ошибка расчета кредитных предложений"
             )
             raise
 
@@ -85,61 +93,3 @@ class OfferService:
                 "Непредвиденная ошибка при расчете кредитных предложений"
             )
             raise
-
-    def _prescore(
-        self,
-        request: LoanStatementRequestDto,
-    ) -> None:
-
-        if request.amount <= 0:
-            raise ValueError(
-                "Сумма кредита должна быть положительной"
-            )
-
-        if request.term <= 0:
-            raise ValueError(
-                "Срок кредита должен быть положительным"
-            )
-
-    def _calculate_rate(
-        self,
-        insurance: bool,
-        salary: bool,
-    ) -> Decimal:
-
-        rate = Decimal(str(settings.base_rate))
-
-        if insurance:
-            rate -= Decimal(str(settings.insurance_discount))
-
-        if salary:
-            rate -= Decimal(str(settings.salary_discount))
-
-        if rate < 0:
-            raise ValueError(
-                "Процентная ставка не может быть отрицательной"
-            )
-
-        return rate
-
-    def _calculate_total_amount(
-        self,
-        amount: Decimal,
-        insurance: bool,
-    ) -> Decimal:
-        total = amount
-        if insurance:
-            total += Decimal(str(settings.insurance_cost))
-        return total
-
-    def _calculate_monthly_payment(
-        self,
-        amount: Decimal,
-        rate: Decimal,
-        term: int,
-    ) -> Decimal:
-        return calculate_annuity_payment(
-            amount=amount,
-            annual_rate=rate,
-            term=term,
-        )

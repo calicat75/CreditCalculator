@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
 from app.models.requests import (
     LoanStatementRequestDto,
@@ -29,13 +29,7 @@ credit_service = CreditService()
 def get_loan_offers(
     request: LoanStatementRequestDto,
 ) -> list[LoanOfferDto]:
-    try:
-        return offer_service.calculate_offers(request)
-    except ValueError as error:
-        raise HTTPException(
-            status_code=400,
-            detail=str(error),
-        ) from error
+    return offer_service.calculate_offers(request)
 
 
 @router.post(
@@ -46,10 +40,4 @@ def get_loan_offers(
 def calculate_credit(
     request: ScoringDataDto,
 ) -> CreditDto:
-    try:
-        return credit_service.calculate_credit(request)
-    except ValueError as error:
-        raise HTTPException(
-            status_code=400,
-            detail=str(error),
-        ) from error
+    return credit_service.calculate_credit(request)

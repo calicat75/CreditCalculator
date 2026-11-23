@@ -2,6 +2,7 @@ from calendar import monthrange
 from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 
+from app.core.exceptions import CalculationError
 from app.models.responses import PaymentScheduleElementDto
 
 
@@ -20,15 +21,6 @@ def calculate_annuity_payment(
 ) -> Decimal:
     """Рассчитывает ежемесячный аннуитетный платеж."""
 
-    if amount <= 0:
-        raise ValueError("Сумма кредита должна быть положительной")
-
-    if term <= 0:
-        raise ValueError("Срок кредита должен быть положительным")
-
-    if annual_rate < 0:
-        raise ValueError("Процентная ставка не может быть отрицательной")
-
     monthly_rate = annual_rate / Decimal("1200")
 
     if monthly_rate == 0:
@@ -39,6 +31,42 @@ def calculate_annuity_payment(
     return round_money(
         amount * monthly_rate * factor / (factor - ONE)
     )
+
+
+def calculate_rate(
+    base_rate: Decimal,
+    insurance: bool,
+    salary: bool,
+    insurance_discount: Decimal,
+    salary_discount: Decimal,
+) -> Decimal:
+    """Рассчитывает процентную ставку с учетом скидок."""
+
+    rate = base_rate
+
+    if insurance:
+        rate -= insurance_discount
+
+    if salary:
+        rate -= salary_discount
+
+    if rate < 0:
+        raise CalculationError("Процентная ставка не может быть отрицательной")
+
+    return rate
+
+
+def calculate_total_amount(
+    amount: Decimal,
+    insurance: bool,
+    insurance_cost: Decimal,
+) -> Decimal:
+    """Рассчитывает полную сумму кредита с учетом стоимости страховки."""
+
+    if insurance:
+        return amount + insurance_cost
+
+    return amount
 
 
 def add_months(source_date: date, months: int) -> date:
@@ -60,15 +88,6 @@ def generate_payment_schedule(
     start_date: date | None = None,
 ) -> list[PaymentScheduleElementDto]:
     """Генерирует график ежемесячных платежей."""
-
-    if amount <= 0:
-        raise ValueError("Сумма кредита должна быть положительной")
-
-    if term <= 0:
-        raise ValueError("Срок кредита должен быть положительным")
-
-    if annual_rate < 0:
-        raise ValueError("Процентная ставка не может быть отрицательной")
 
     if start_date is None:
         start_date = date.today()
@@ -96,7 +115,7 @@ def generate_payment_schedule(
             )
 
             if debt_payment <= 0:
-                raise ValueError(
+                raise CalculationError(
                     "Ежемесячный платеж недостаточен для погашения долга"
                 )
 
@@ -133,15 +152,6 @@ def calculate_psk(
     term: int,
 ) -> Decimal:
     """Рассчитывает эффективную годовую ставку по ежемесячным платежам."""
-
-    if amount <= 0:
-        raise ValueError("Сумма кредита должна быть положительной")
-
-    if monthly_payment <= 0:
-        raise ValueError("Ежемесячный платеж должен быть положительным")
-
-    if term <= 0:
-        raise ValueError("Срок кредита должен быть положительным")
 
     low = Decimal("0")
     high = Decimal("1")

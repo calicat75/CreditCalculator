@@ -1,11 +1,15 @@
 from decimal import Decimal
-from calculator.app.core.config import settings
-from calculator.app.core.logging import get_logger
-from calculator.app.models.requests import ScoringDataDto
-from calculator.app.models.responses import CreditDto
-from calculator.app.utils.calculations import (
+
+from app.core.config import settings
+from app.core.exceptions import CalculationError
+from app.core.logging import get_logger
+from app.models.requests import ScoringDataDto
+from app.models.responses import CreditDto
+from app.utils.calculations import (
     calculate_annuity_payment,
     calculate_psk,
+    calculate_rate,
+    calculate_total_amount,
     generate_payment_schedule,
 )
 
@@ -25,29 +29,37 @@ class CreditService:
         )
 
         try:
-            self._validate_scoring(request)
-
-            rate = self._calculate_rate(request)
-
-            amount = self._calculate_amount(request)
-
-            monthly_payment = self._calculate_monthly_payment(
-                amount,
-                rate,
-                request.term,
+            rate = calculate_rate(
+                base_rate=Decimal(str(settings.base_rate)),
+                insurance=request.is_insurance_enabled,
+                salary=request.is_salary_client,
+                insurance_discount=Decimal(str(settings.insurance_discount)),
+                salary_discount=Decimal(str(settings.salary_discount)),
             )
 
-            payment_schedule = self._generate_schedule(
-                amount,
-                rate,
-                request.term,
-                monthly_payment,
+            amount = calculate_total_amount(
+                amount=request.amount,
+                insurance=request.is_insurance_enabled,
+                insurance_cost=Decimal(str(settings.insurance_cost)),
             )
 
-            psk = self._calculate_psk(
-                amount,
-                monthly_payment,
-                request.term,
+            monthly_payment = calculate_annuity_payment(
+                amount=amount,
+                annual_rate=rate,
+                term=request.term,
+            )
+
+            payment_schedule = generate_payment_schedule(
+                amount=amount,
+                annual_rate=rate,
+                term=request.term,
+                monthly_payment=monthly_payment,
+            )
+
+            psk = calculate_psk(
+                amount=amount,
+                monthly_payment=monthly_payment,
+                term=request.term,
             )
 
             credit = CreditDto(
@@ -70,9 +82,9 @@ class CreditService:
 
             return credit
 
-        except ValueError:
+        except CalculationError:
             logger.warning(
-                "Ошибка проверки или расчета кредитной заявки"
+                "Ошибка расчета кредитной заявки"
             )
             raise
 
@@ -81,91 +93,3 @@ class CreditService:
                 "Непредвиденная ошибка при расчете кредита"
             )
             raise
-
-    def _validate_scoring(
-        self,
-        request: ScoringDataDto,
-    ) -> None:
-
-        if request.amount <= 0:
-            raise ValueError(
-                "Сумма кредита должна быть положительной"
-            )
-
-        if request.term <= 0:
-            raise ValueError(
-                "Срок кредита должен быть положительным"
-            )
-
-    def _calculate_rate(
-        self,
-        request: ScoringDataDto,
-    ) -> Decimal:
-
-        rate = Decimal(str(settings.base_rate))
-
-        if request.is_insurance_enabled:
-            rate -= Decimal(str(settings.insurance_discount))
-
-        if request.is_salary_client:
-            rate -= Decimal(str(settings.salary_discount))
-
-        if rate < 0:
-            raise ValueError(
-                "Процентная ставка не может быть отрицательной"
-            )
-
-        return rate
-
-    def _calculate_amount(
-        self,
-        request: ScoringDataDto,
-    ) -> Decimal:
-
-        amount = request.amount
-
-        if request.is_insurance_enabled:
-            amount += Decimal(str(settings.insurance_cost))
-
-        return amount
-
-    def _calculate_monthly_payment(
-        self,
-        amount: Decimal,
-        rate: Decimal,
-        term: int,
-    ) -> Decimal:
-
-        return calculate_annuity_payment(
-            amount=amount,
-            annual_rate=rate,
-            term=term,
-        )
-
-    def _generate_schedule(
-        self,
-        amount: Decimal,
-        rate: Decimal,
-        term: int,
-        monthly_payment: Decimal,
-    ):
-
-        return generate_payment_schedule(
-            amount=amount,
-            annual_rate=rate,
-            term=term,
-            monthly_payment=monthly_payment,
-        )
-
-    def _calculate_psk(
-        self,
-        amount: Decimal,
-        monthly_payment: Decimal,
-        term: int,
-    ) -> Decimal:
-
-        return calculate_psk(
-            amount=amount,
-            monthly_payment=monthly_payment,
-            term=term,
-        )
