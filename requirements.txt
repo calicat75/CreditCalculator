@@ -6,4 +6,4 @@ python-dotenv
 
 pytest
 pytest-cov
-httpxpython -m venv venv
+httpx
